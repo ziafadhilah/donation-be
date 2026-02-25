@@ -30,7 +30,7 @@ class DonationApiController extends Controller
             'name' => 'nullable|string|max:255',
             'email' => 'nullable|email|max:255',
             'is_anonymous' => 'nullable|boolean',
-            'payment_method' => 'required|string'
+            'payment_method' => 'nullable|string'
         ]);
 
         try {
