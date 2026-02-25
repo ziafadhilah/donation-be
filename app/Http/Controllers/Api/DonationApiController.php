@@ -11,6 +11,16 @@ use Illuminate\Support\Facades\Log;
 
 class DonationApiController extends Controller
 {
+
+    public function index(Request $request)
+    {
+        $donations = Donation::with('campaign')
+            ->orderBy('created_at', 'desc')
+            ->paginate(10);
+
+        return response()->json($donations);
+    }
+
     public function store(Request $request)
     {
         $request->validate([
