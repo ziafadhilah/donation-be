@@ -2,29 +2,21 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
 use App\Models\FundRealization;
-use Illuminate\Http\Request;
 
-class FundRealizationApiController extends Controller
+class FundRealizationApiController extends BaseApiController
 {
     public function index()
     {
-        $fundRealizations = FundRealization::all();
+        $data = FundRealization::all();
 
-        return response()->json([
-            'success' => true,
-            'data' => $fundRealizations
-        ]);
+        return $this->success($data, 'Fund realizations list');
     }
 
     public function withCampaign()
     {
-        $fundRealizations = FundRealization::with('campaign')->get();
+        $data = FundRealization::with('campaign')->get();
 
-        return response()->json([
-            'success' => true,
-            'data' => $fundRealizations
-        ]);
+        return $this->success($data, 'Fund realizations with campaign');
     }
 }

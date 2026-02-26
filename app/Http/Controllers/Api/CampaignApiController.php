@@ -2,28 +2,21 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
 use App\Models\Campaign;
 
-class CampaignApiController extends Controller
+class CampaignApiController extends BaseApiController
 {
     public function index()
     {
-        $campaigns = Campaign::all();
+        $campaigns = Campaign::with('donations')->get();
 
-        return response()->json([
-            'success' => true,
-            'data' => $campaigns
-        ]);
+        return $this->success($campaigns, 'Campaign list');
     }
 
     public function withFundRealizations()
     {
         $campaigns = Campaign::with('fundRealizations')->get();
 
-        return response()->json([
-            'success' => true,
-            'data' => $campaigns
-        ]);
+        return $this->success($campaigns, 'Campaign with realizations');
     }
 }

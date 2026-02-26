@@ -4,6 +4,7 @@ use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DonationController;
 use App\Http\Controllers\FundRealizationController;
+use App\Http\Controllers\UnitController;
 use Illuminate\Support\Facades\Route;
 
 // Route::get('/', function () {
@@ -35,5 +36,14 @@ Route::prefix('/')->group(function () {
         Route::get('/{fundRealization}/edit', [FundRealizationController::class, 'edit'])->name('edit');
         Route::put('/{fundRealization}', [FundRealizationController::class, 'update'])->name('update');
         Route::delete('/{fundRealization}', [FundRealizationController::class, 'destroy'])->name('destroy');
+    });
+
+    Route::prefix('/units')->name('units.')->group(function () {
+        Route::get('/', [UnitController::class, 'index'])->name('index');
+        Route::get('/create', [UnitController::class, 'create'])->name('create');
+        Route::post('/', [UnitController::class, 'store'])->name('store');
+        Route::get('/{unit}/edit', [UnitController::class, 'edit'])->name('edit');
+        Route::put('/{unit}', [UnitController::class, 'update'])->name('update');
+        Route::delete('/{unit}', [UnitController::class, 'destroy'])->name('destroy');
     });
 });

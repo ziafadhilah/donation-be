@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Campaign;
 use App\Models\FundRealization;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class FundRealizationController extends Controller
 {
@@ -37,16 +38,20 @@ class FundRealizationController extends Controller
             'status' => 'required|in:in_progress,done'
         ]);
 
-        $totalRealized = FundRealization::where('campaign_id', $request->campaign_id)
-            ->sum('amount');
+        DB::transaction(function () use ($request) {
 
-        $campaign = Campaign::find($request->campaign_id);
+            $campaign = Campaign::lockForUpdate()->findOrFail($request->campaign_id);
 
-        if (($totalRealized + $request->amount) > $campaign->current_amount) {
-            return back()->withErrors('Dana tidak mencukupi');
-        }
+            $totalRealized = $campaign->fundRealizations()
+                ->where('status', 'done')
+                ->sum('amount');
 
-        FundRealization::create($request->all());
+            if (($totalRealized + $request->amount) > $campaign->current_amount) {
+                return back()->withErrors('Dana tidak mencukupi');
+            }
+
+            $campaign->fundRealizations()->create($request->all());
+        });
 
         return redirect()->route('fund-realizations.index')
             ->with('success', 'Realisasi berhasil ditambahkan');

@@ -12,17 +12,36 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('donations', function (Blueprint $table) {
-            $table->id();
             $table->foreignId('campaign_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('unit_id')->nullable()->constrained()->nullOnDelete();
+
+            $table->string('reference')->unique();
+
             $table->string('name')->nullable();
             $table->string('phone');
             $table->string('email')->nullable();
+            $table->boolean('is_anonymous')->default(false);
+
             $table->decimal('amount', 15, 2);
-            $table->string('reference')->unique();
+            $table->integer('unit_qty')->nullable();
+
+            $table->string('payment_method')->nullable();
             $table->string('duitku_reference')->nullable();
-            $table->string('status')->default('pending');
-            $table->text('callback_payload')->nullable();
+
+            $table->enum('status', ['pending', 'paid', 'failed', 'expired'])->default('pending');
+
+            $table->timestamp('paid_at')->nullable();
+            $table->timestamp('expired_at')->nullable();
+
+            $table->json('callback_payload')->nullable();
+            $table->text('failure_reason')->nullable();
+
+            $table->boolean('is_visible')->default(true);
+
             $table->timestamps();
+
+            $table->index(['campaign_id', 'status']);
+            $table->index('created_at');
         });
     }
 

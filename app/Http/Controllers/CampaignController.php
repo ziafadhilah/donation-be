@@ -55,11 +55,23 @@ class CampaignController extends Controller
             'goal_amount' => 'required|numeric|min:1000',
         ]);
 
+        if ($request->goal_amount < $campaign->current_amount) {
+            return back()
+                ->withErrors('Goal tidak boleh lebih kecil dari dana terkumpul.')
+                ->withInput();
+        }
+
         $campaign->update([
             'title' => $request->title,
             'description' => $request->description,
             'goal_amount' => $request->goal_amount,
         ]);
+
+        if ($campaign->current_amount >= $campaign->goal_amount) {
+            $campaign->update(['status' => 'completed']);
+        } else {
+            $campaign->update(['status' => 'active']);
+        }
 
         return redirect()->route('campaigns.index')
             ->with('success', 'Campaign updated successfully');

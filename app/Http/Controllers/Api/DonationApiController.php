@@ -2,114 +2,135 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
 use App\Models\Donation;
+use App\Models\Unit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 
-class DonationApiController extends Controller
+class DonationApiController extends BaseApiController
 {
-
-    public function index(Request $request)
+    public function index()
     {
-        $donations = Donation::with('campaign')
-            ->orderBy('created_at', 'desc')
+        $donations = Donation::with(['campaign', 'unit'])
+            ->latest()
             ->paginate(10);
 
-        return response()->json($donations);
+        return $this->success($donations, 'Donation list');
     }
 
     public function store(Request $request)
     {
         $request->validate([
-            'campaign_id' => 'required|exists:campaigns,id',
-            'amount' => 'required|numeric|min:1000',
-            'phone' => 'required|string|min:10|max:15',
-            'name' => 'nullable|string|max:255',
-            'email' => 'nullable|email|max:255',
-            'is_anonymous' => 'nullable|boolean',
-            'payment_method' => 'nullable|string'
+            'campaign_id'   => 'required|exists:campaigns,id',
+            'amount'        => 'required|numeric|min:1000',
+            'unit_id'       => 'nullable|exists:units,id',
+            'unit_qty'      => 'nullable|integer|min:1',
+            'phone'         => 'required|string|min:10|max:15',
+            'name'          => 'nullable|string|max:255',
+            'email'         => 'nullable|email|max:255',
+            'is_anonymous'  => 'nullable|boolean',
         ]);
-
-        try {
-
-            return DB::transaction(function () use ($request) {
-
-                $reference = 'DON-' . now()->format('YmdHis') . '-' . random_int(1000, 9999);
-
-                $donation = Donation::create([
-                    'campaign_id' => $request->campaign_id,
-                    'name' => $request->boolean('is_anonymous') ? 'Anonim' : $request->name,
-                    'phone' => $request->phone,
-                    'email' => $request->email,
-                    'amount' => $request->amount,
-                    'payment_method' => $request->payment_method,
-                    'reference' => $reference,
-                    'status' => 'pending'
-                ]);
-
-                $merchantCode = config('duitku.merchant_code');
-                $apiKey = config('duitku.api_key');
-                $amount = (int) $donation->amount;
-
-                $signature = md5($merchantCode . $reference . $amount . $apiKey);
-
-                $endpoint = config('duitku.sandbox')
-                    ? 'https://sandbox.duitku.com/webapi/api/merchant/v2/inquiry'
-                    : 'https://passport.duitku.com/webapi/api/merchant/v2/inquiry';
-
-                $response = Http::post($endpoint, [
-                    'merchantCode' => $merchantCode,
-                    'paymentAmount' => $amount,
-                    'merchantOrderId' => $reference,
-                    'paymentMethod' => $donation->payment_method,
-                    'productDetails' => 'Donasi Gereja',
-                    'customerEmail' => $donation->email ?? 'donasi@email.com',
-                    'customerPhone' => $donation->phone,
-                    'callbackUrl' => config('app.url') . '/api/duitku/callback',
-                    'returnUrl' => config('app.url') . '/payment-success?reference=' . $reference,
-                    'signature' => $signature
-                ]);
-
-                if (!$response->successful()) {
-                    throw new \Exception('Gagal request ke Duitku');
-                }
-
-                $data = $response->json();
-
-                return response()->json([
-                    'message' => 'Redirect ke payment',
-                    'reference' => $reference,
-                    'payment_url' => $data['paymentUrl'] ?? null
-                ]);
-            });
-        } catch (\Throwable $e) {
-
-            Log::error('Donation store failed', [
-                'error' => $e->getMessage()
-            ]);
-
-            return response()->json([
-                'message' => 'Failed to create donation'
-            ], 500);
-        }
-    }
-
-    public function callback(Request $request)
-    {
-        Log::info('CALLBACK MASUK', $request->all());
 
         return DB::transaction(function () use ($request) {
 
-            $merchantCode = config('duitku.merchant_code');
-            $apiKey = config('duitku.api_key');
+            $reference = 'DON-' . now()->format('YmdHis') . '-' . random_int(1000, 9999);
 
-            $reference = $request->merchantOrderId;
-            $amount = (int) $request->input('amount');
-            $resultCode = $request->resultCode;
-            $signature = $request->signature;
+            $donation = Donation::create([
+                'campaign_id'  => $request->campaign_id,
+                'unit_id'      => $request->unit_id,
+                'unit_qty'     => $request->unit_qty,
+                'name'         => $request->boolean('is_anonymous') ? 'Anonim' : $request->name,
+                'is_anonymous' => $request->boolean('is_anonymous'),
+                'phone'        => $request->phone,
+                'email'        => $request->email,
+                'amount'       => $request->amount,
+                'reference'    => $reference,
+                'status'       => 'pending'
+            ]);
+
+            return $this->success([
+                'reference' => $reference
+            ], 'Donation created');
+        });
+    }
+
+    public function pay(Request $request, $reference)
+    {
+        $methods = config('payment.methods');
+
+        $request->validate([
+            'payment_method' => ['required', Rule::in($methods)]
+        ]);
+
+        return DB::transaction(function () use ($request, $reference) {
+
+            $donation = Donation::where('reference', $reference)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$donation) {
+                return $this->error('Donation not found', null, 404);
+            }
+
+            if ($donation->status !== 'pending') {
+                return $this->error('Donation already processed', null, 400);
+            }
+
+            $donation->update([
+                'payment_method' => $request->payment_method
+            ]);
+
+            // Call Duitku here
+            $merchantCode = config('duitku.merchant_code');
+            $apiKey       = config('duitku.api_key');
+            $amount       = (int) $donation->amount;
+
+            $signature = md5($merchantCode . $reference . $amount . $apiKey);
+
+            $endpoint = config('duitku.sandbox')
+                ? 'https://sandbox.duitku.com/webapi/api/merchant/v2/inquiry'
+                : 'https://passport.duitku.com/webapi/api/merchant/v2/inquiry';
+
+            $response = Http::post($endpoint, [
+                'merchantCode'   => $merchantCode,
+                'paymentAmount'  => $amount,
+                'merchantOrderId' => $reference,
+                'paymentMethod'  => $donation->payment_method,
+                'productDetails' => 'Donasi Gereja',
+                'customerEmail'  => $donation->email ?? 'donasi@email.com',
+                'customerPhone'  => $donation->phone,
+                'callbackUrl'    => config('app.url') . '/api/duitku/callback',
+                'returnUrl'      => config('app.url') . '/payment-success?reference=' . $reference,
+                'signature'      => $signature
+            ]);
+
+            if (!$response->successful()) {
+                return $this->error('Failed request to gateway', null, 500);
+            }
+
+            $data = $response->json();
+
+            return $this->success([
+                'payment_url' => $data['paymentUrl'] ?? null
+            ], 'Redirect to payment');
+        });
+    }
+
+
+    public function callback(Request $request)
+    {
+        return DB::transaction(function () use ($request) {
+
+            $merchantCode = config('duitku.merchant_code');
+            $apiKey       = config('duitku.api_key');
+
+            $reference       = $request->merchantOrderId;
+            $amount          = (int) $request->input('amount');
+            $resultCode      = $request->resultCode;
+            $signature       = $request->signature;
             $duitkuReference = $request->reference;
 
             $donation = Donation::where('reference', $reference)
@@ -117,38 +138,42 @@ class DonationApiController extends Controller
                 ->first();
 
             if (!$donation) {
-                return response()->json(['message' => 'Donation not found'], 404);
+                return $this->error('Donation not found', null, 404);
+            }
+
+            if ($donation->status === 'paid') {
+                return $this->success(null, 'Already processed');
             }
 
             if ((int)$donation->amount !== $amount) {
-                return response()->json(['message' => 'Invalid amount'], 400);
+                return $this->error('Invalid amount', null, 400);
             }
 
             $expectedSignature = md5($merchantCode . $amount . $reference . $apiKey);
 
             if ($signature !== $expectedSignature) {
-                return response()->json(['message' => 'Invalid signature'], 403);
+                return $this->error('Invalid signature', null, 403);
             }
 
             $donation->update([
                 'duitku_reference' => $duitkuReference,
-                'callback_payload' => json_encode($request->all())
+                'callback_payload' => $request->all()
             ]);
 
-            if ($resultCode === "00" && $donation->status !== 'paid') {
+            if ($resultCode === "00") {
 
-                $donation->update(['status' => 'paid']);
+                $donation->update([
+                    'status'  => 'paid',
+                    'paid_at' => now()
+                ]);
 
                 $campaign = $donation->campaign()->lockForUpdate()->first();
-
                 $campaign->increment('current_amount', $donation->amount);
-
-                $campaign->refresh();
 
                 if ($campaign->current_amount >= $campaign->goal_amount) {
                     $campaign->update(['status' => 'completed']);
                 }
-            } elseif ($resultCode !== "00" && $donation->status !== 'paid') {
+            } else {
 
                 $donation->update([
                     'status' => 'failed',
@@ -156,7 +181,7 @@ class DonationApiController extends Controller
                 ]);
             }
 
-            return response()->json(['message' => 'Callback processed']);
+            return $this->success(null, 'Callback processed');
         });
     }
 
@@ -165,22 +190,16 @@ class DonationApiController extends Controller
         $donation = Donation::where('reference', $reference)->first();
 
         if (!$donation) {
-            return response()->json([
-                'message' => 'Donation not found'
-            ], 404);
+            return $this->error('Donation not found', null, 404);
         }
 
-        return response()->json([
-            'reference' => $donation->reference,
-            'status' => $donation->status,
-            'amount' => (float) $donation->amount,
-            'payment_method' => $donation->payment_method,
-            'duitku_reference' => $donation->duitku_reference,
-            'is_paid' => $donation->status === 'paid',
-            'is_failed' => $donation->status === 'failed',
-            'failure_reason' => $donation->status === 'failed'
-                ? $donation->failure_reason
-                : null
-        ]);
+        return $this->success([
+            'reference'      => $donation->reference,
+            'status'         => $donation->status,
+            'amount'         => (float) $donation->amount,
+            'paid_at'        => $donation->paid_at,
+            'unit'           => $donation->unit?->name,
+            'unit_qty'       => $donation->unit_qty,
+        ], 'Donation status');
     }
 }

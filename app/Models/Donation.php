@@ -8,9 +8,12 @@ class Donation extends Model
 {
     protected $fillable = [
         'campaign_id',
+        'unit_id',
+        'unit_qty',
         'name',
         'phone',
         'email',
+        'is_anonymous',
         'amount',
         'payment_method',
         'reference',
@@ -18,16 +21,27 @@ class Donation extends Model
         'failure_reason',
         'duitku_reference',
         'callback_payload',
+        'paid_at',
+        'expired_at',
         'is_visible'
     ];
 
     protected $casts = [
-        'is_visible' => 'boolean'
+        'is_visible' => 'boolean',
+        'is_anonymous' => 'boolean',
+        'callback_payload' => 'array',
+        'paid_at' => 'datetime',
+        'expired_at' => 'datetime',
     ];
 
     public function campaign()
     {
         return $this->belongsTo(Campaign::class);
+    }
+
+    public function unit()
+    {
+        return $this->belongsTo(Unit::class);
     }
 
     public function getMaskedPhoneAttribute()
@@ -39,6 +53,8 @@ class Donation extends Model
 
     public function getMaskedEmailAttribute()
     {
+        if (!$this->email) return null;
+
         $parts = explode('@', $this->email);
 
         if (count($parts) < 2) return $this->email;
