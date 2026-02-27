@@ -17,6 +17,13 @@ class Campaign extends Model
         'status'
     ];
 
+    protected $casts = [
+        'goal_amount' => 'float',
+        'current_amount' => 'float',
+        'start_date' => 'datetime',
+        'end_date' => 'datetime',
+    ];
+
     public function donations()
     {
         return $this->hasMany(Donation::class);
@@ -37,5 +44,12 @@ class Campaign extends Model
     public function getRemainingBalanceAttribute()
     {
         return $this->current_amount - $this->total_realized;
+    }
+
+    public function getProgressPercentageAttribute()
+    {
+        if ($this->goal_amount == 0) return 0;
+
+        return round(($this->current_amount / $this->goal_amount) * 100, 2);
     }
 }
