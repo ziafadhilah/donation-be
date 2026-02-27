@@ -103,9 +103,8 @@
                                     <div>
                                         <strong>{{ $donation->name ?? 'Hamba Tuhan' }}</strong><br>
                                         <small class="text-muted">
-                                            {{ $donation->masked_phone }}
                                             @if ($donation->email)
-                                                • {{ $donation->masked_email }}
+                                                {{ $donation->masked_email }}
                                             @endif
                                         </small>
                                     </div>

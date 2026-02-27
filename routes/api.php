@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\DonationApiController;
 use App\Http\Controllers\Api\CampaignApiController;
 use App\Http\Controllers\Api\FundRealizationApiController;
+use App\Http\Controllers\Api\UnitApiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -45,3 +46,9 @@ Route::post('/duitku/callback', [DonationApiController::class, 'callback']);
 
 Route::get('/fund-realizations', [FundRealizationApiController::class, 'index']);
 Route::get('/fund-realizations/with-campaign', [FundRealizationApiController::class, 'withCampaign']);
+
+// ================================
+// Units
+// ================================
+
+Route::get('/units', [UnitApiController::class, 'index']);
