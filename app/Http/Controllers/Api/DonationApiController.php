@@ -24,35 +24,62 @@ class DonationApiController extends BaseApiController
     public function store(Request $request)
     {
         $request->validate([
-            'campaign_id'   => 'required|exists:campaigns,id',
-            'amount'        => 'required|numeric|min:1000',
-            'unit_id'       => 'nullable|exists:units,id',
-            'unit_qty'      => 'nullable|integer|min:1',
-            'phone'         => 'required|string|min:10|max:15',
-            'name'          => 'nullable|string|max:255',
-            'email'         => 'nullable|email|max:255',
-            'is_anonymous'  => 'nullable|boolean',
+            'campaign_id'  => 'required|exists:campaigns,id',
+            'unit_id'      => 'nullable|exists:units,id',
+            'unit_qty'     => 'nullable|integer|min:1',
+            'amount'       => 'nullable|numeric|min:1000',
+            'phone'        => 'required|string|min:10|max:15',
+            'name'         => 'nullable|string|max:255',
+            'email'        => 'nullable|email|max:255',
+            'is_anonymous' => 'nullable|boolean',
         ]);
 
         return DB::transaction(function () use ($request) {
 
             $reference = 'DON-' . now()->format('YmdHis') . '-' . random_int(1000, 9999);
 
-            $donation = Donation::create([
+            $finalAmount = 0;
+            $unitQty = null;
+            $unitId = null;
+
+            // 🔥 MODE UNIT (amount DI-OVERRIDE TOTAL)
+            if ($request->unit_id) {
+
+                $unit = Unit::where('id', $request->unit_id)
+                    ->where('is_active', true)
+                    ->firstOrFail();
+
+                $unitQty = $request->unit_qty ?? 1;
+
+                $finalAmount = $unit->price * $unitQty;
+
+                $unitId = $unit->id;
+            } else {
+
+                // 🔥 MODE MANUAL
+                if (!$request->amount) {
+                    return $this->error('Amount wajib diisi', null, 422);
+                }
+
+                $finalAmount = $request->amount;
+            }
+
+            Donation::create([
                 'campaign_id'  => $request->campaign_id,
-                'unit_id'      => $request->unit_id,
-                'unit_qty'     => $request->unit_qty,
+                'unit_id'      => $unitId,
+                'unit_qty'     => $unitQty,
                 'name'         => $request->boolean('is_anonymous') ? 'Anonim' : $request->name,
                 'is_anonymous' => $request->boolean('is_anonymous'),
                 'phone'        => $request->phone,
                 'email'        => $request->email,
-                'amount'       => $request->amount,
+                'amount'       => $finalAmount,
                 'reference'    => $reference,
                 'status'       => 'pending'
             ]);
 
             return $this->success([
-                'reference' => $reference
+                'reference' => $reference,
+                'amount'    => $finalAmount
             ], 'Donation created');
         });
     }

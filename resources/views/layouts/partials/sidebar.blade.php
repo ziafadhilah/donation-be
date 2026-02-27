@@ -13,6 +13,9 @@
             href="{{ route('donations.index') }}">
             <i class="fa fa-hand-holding-dollar"></i>Donations
         </a>
+        <a class="nav-link {{ request()->routeIs('units.*') ? 'active' : '' }}" href="{{ route('units.index') }}">
+            <i class="fa fa-building"></i>Units
+        </a>
         <a class="nav-link {{ request()->routeIs('fund-realizations.*') ? 'active' : '' }}"
             href="{{ route('fund-realizations.index') }}">
             <i class="fa fa-file-invoice-dollar"></i>Fund Realizations

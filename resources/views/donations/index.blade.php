@@ -151,7 +151,8 @@
                                 </td>
 
                                 <td>
-                                    <form method="POST" action="{{ route('donations.toggleVisibility', $donation) }}">
+                                    <form method="POST"
+                                        action="{{ route('donations.toggleVisibility', ['donation' => $donation->id]) }}">
                                         @csrf
                                         @method('PATCH')
 
@@ -164,7 +165,8 @@
 
                                 <td>
                                     @if ($donation->status !== 'paid' && $donation->status !== 'failed')
-                                        <form method="POST" action="{{ route('donations.forceSuccess', $donation) }}">
+                                        <form method="POST"
+                                            action="{{ route('donations.forceSuccess', ['donation' => $donation->id]) }}">
                                             @csrf
                                             @method('PATCH')
 

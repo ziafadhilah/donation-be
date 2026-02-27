@@ -21,6 +21,9 @@ class UnitController extends Controller
 
     public function store(Request $request)
     {
+        $request->merge([
+            'price' => str_replace('.', '', $request->price)
+        ]);
         $request->validate([
             'code' => 'required|string|max:50|unique:units,code',
             'name' => 'required|string|max:255',
@@ -46,6 +49,9 @@ class UnitController extends Controller
 
     public function update(Request $request, Unit $unit)
     {
+        $request->merge([
+            'price' => str_replace('.', '', $request->price)
+        ]);
         $request->validate([
             'code' => 'required|string|max:50|unique:units,code,' . $unit->id,
             'name' => 'required|string|max:255',

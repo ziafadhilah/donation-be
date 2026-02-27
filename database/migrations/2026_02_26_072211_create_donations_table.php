@@ -12,6 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('donations', function (Blueprint $table) {
+            $table->id();
             $table->foreignId('campaign_id')->constrained()->cascadeOnDelete();
             $table->foreignId('unit_id')->nullable()->constrained()->nullOnDelete();
 

@@ -25,8 +25,8 @@ Route::prefix('/')->group(function () {
 
     Route::prefix('/donations')->name('donations.')->group(function () {
         Route::get('/', [DonationController::class, 'index'])->name('index');
-        Route::patch('/{donation}/toggle-visibility', [DonationController::class, 'toggleVisibility'])->name('toggleVisibility');
-        Route::patch('/{donation}/force-success', [DonationController::class, 'forceSuccess'])->name('forceSuccess');
+        Route::patch('/{donation}/toggle-visibility', [DonationController::class, 'toggleVisibility'])->whereNumber('donation')->name('toggleVisibility');
+        Route::patch('/{donation}/force-success', [DonationController::class, 'forceSuccess'])->whereNumber('donation')->name('forceSuccess');
     });
 
     Route::prefix('/fund-realizations')->name('fund-realizations.')->group(function () {

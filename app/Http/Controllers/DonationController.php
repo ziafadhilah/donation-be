@@ -37,7 +37,8 @@ class DonationController extends Controller
             });
         }
 
-        $donations = $query->latest()->paginate(10)->withQueryString();
+        // $donations = $query->latest()->paginate(10)->withQueryString();
+        $donations = $query->latest()->paginate(10);
         $campaigns = Campaign::all();
 
         return view('donations.index', compact('donations', 'campaigns'));
