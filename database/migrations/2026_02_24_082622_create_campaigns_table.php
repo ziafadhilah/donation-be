@@ -17,7 +17,12 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->decimal('goal_amount', 15, 2);
             $table->decimal('current_amount', 15, 2)->default(0);
+            $table->dateTime('start_date');
+            $table->dateTime('end_date')->nullable();
+            $table->enum('status', ['active', 'completed', 'inactive'])
+                ->default('active');
             $table->timestamps();
+            $table->index('status');
         });
     }
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Campaign;
 use App\Models\Donation;
+use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
@@ -21,8 +22,7 @@ class DashboardController extends Controller
             ->sum('total_realized');
 
         // Total Sisa Dana Global
-        $totalRemaining = Campaign::all()
-            ->sum('remaining_balance');
+        $totalRemaining = Campaign::sum(DB::raw('current_amount - 0'));
 
         // Donation Hari Ini
         $todayAmount = Donation::where('status', 'paid')

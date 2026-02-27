@@ -11,7 +11,10 @@ class Campaign extends Model
         'title',
         'description',
         'goal_amount',
-        'current_amount'
+        'current_amount',
+        'start_date',
+        'end_date',
+        'status'
     ];
 
     public function donations()

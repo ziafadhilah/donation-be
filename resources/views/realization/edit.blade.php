@@ -1,62 +1,78 @@
 @extends('layouts.main')
 
 @section('content')
-    <h4>Edit Realisasi Dana</h4>
+    <div class="container">
 
-    @if ($errors->any())
-        <div class="alert alert-danger">
-            {{ $errors->first() }}
-        </div>
-    @endif
+        <h4 class="mb-3">Edit Realisasi Dana</h4>
 
-    <div class="card shadow-sm p-4">
-        <form method="POST" action="{{ route('fund-realizations.update', $fundRealization) }}">
-            @csrf
-            @method('PUT')
+        @if ($errors->any())
+            <div class="alert alert-danger">
+                {{ $errors->first() }}
+            </div>
+        @endif
 
-            <div class="mb-3">
-                <label>Pilih Sumber</label>
-                <select name="campaign_id" class="form-control" required>
-                    @foreach ($campaigns as $campaign)
-                        <option value="{{ $campaign->id }}"
-                            {{ $fundRealization->campaign_id == $campaign->id ? 'selected' : '' }}>
-                            {{ $campaign->title }}
+        <div class="card shadow-sm p-4">
+            <form method="POST" action="{{ route('fund-realizations.update', $fundRealization) }}">
+                @csrf
+                @method('PUT')
+
+                {{-- PILIH SUMBER --}}
+                <div class="mb-3">
+                    <label class="form-label">Pilih Sumber</label>
+                    <select name="campaign_id" class="form-select" required>
+                        @foreach ($campaigns as $campaign)
+                            <option value="{{ $campaign->id }}"
+                                {{ old('campaign_id', $fundRealization->campaign_id) == $campaign->id ? 'selected' : '' }}>
+                                {{ $campaign->title }}
+                                (Sisa: Rp {{ number_format($campaign->remaining_balance, 0, ',', '.') }})
+                            </option>
+                        @endforeach
+                    </select>
+                    <small class="text-muted">
+                        Pastikan dana tersedia mencukupi sebelum update.
+                    </small>
+                </div>
+
+                {{-- JUDUL --}}
+                <div class="mb-3">
+                    <label class="form-label">Judul</label>
+                    <input type="text" name="title" value="{{ old('title', $fundRealization->title) }}"
+                        class="form-control" required>
+                </div>
+
+                {{-- JUMLAH --}}
+                <div class="mb-3">
+                    <label class="form-label">Jumlah Dana</label>
+                    <input type="text" name="amount" id="amountInput"
+                        value="{{ old('amount', number_format($fundRealization->amount, 0, ',', '.')) }}"
+                        class="form-control" required>
+                </div>
+
+                {{-- STATUS --}}
+                <div class="mb-3">
+                    <label class="form-label">Status</label>
+                    <select name="status" class="form-select">
+                        <option value="in_progress"
+                            {{ old('status', $fundRealization->status) == 'in_progress' ? 'selected' : '' }}>
+                            In Progress
                         </option>
-                    @endforeach
-                </select>
-            </div>
+                        <option value="done" {{ old('status', $fundRealization->status) == 'done' ? 'selected' : '' }}>
+                            Done
+                        </option>
+                    </select>
+                </div>
 
-            <div class="mb-3">
-                <label>Judul</label>
-                <input type="text" name="title" value="{{ $fundRealization->title }}" class="form-control" required>
-            </div>
+                {{-- DESKRIPSI --}}
+                <div class="mb-3">
+                    <label class="form-label">Deskripsi</label>
+                    <textarea name="description" class="form-control" rows="3">{{ old('description', $fundRealization->description) }}</textarea>
+                </div>
 
-            <div class="mb-3">
-                <label>Jumlah Harga</label>
-                <input type="text" name="amount" id="amountInput"
-                    value="{{ number_format($fundRealization->amount, 0, ',', '.') }}" class="form-control" required>
-            </div>
+                <button class="btn btn-success">Update</button>
+                <a href="{{ route('fund-realizations.index') }}" class="btn btn-secondary">Kembali</a>
+            </form>
+        </div>
 
-            <div class="mb-3">
-                <label>Status</label>
-                <select name="status" class="form-control">
-                    <option value="in_progress" {{ $fundRealization->status == 'in_progress' ? 'selected' : '' }}>
-                        In Progress
-                    </option>
-                    <option value="done" {{ $fundRealization->status == 'done' ? 'selected' : '' }}>
-                        Done
-                    </option>
-                </select>
-            </div>
-
-            <div class="mb-3">
-                <label>Deskripsi</label>
-                <textarea name="description" class="form-control" rows="3">{{ $fundRealization->description }}</textarea>
-            </div>
-
-            <button class="btn btn-success">Update</button>
-            <a href="{{ route('fund-realizations.index') }}" class="btn btn-secondary">Kembali</a>
-        </form>
     </div>
 
     <script>

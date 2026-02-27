@@ -26,13 +26,19 @@ class CampaignController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'goal_amount' => 'required|numeric|min:1000',
+            'start_date' => 'required|date',
+            'end_date' => 'nullable|date|after:start_date',
+            'status' => 'required|in:active,inactive',
         ]);
 
         Campaign::create([
             'title' => $request->title,
             'description' => $request->description,
             'goal_amount' => $request->goal_amount,
-            'current_amount' => 0
+            'current_amount' => $request->current_amount ?? 0,
+            'start_date' => $request->start_date,
+            'end_date' => $request->end_date,
+            'status' => $request->status,
         ]);
 
         return redirect()->route('campaigns.index')
