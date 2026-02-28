@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Models\Campaign;
 use App\Models\Donation;
 use App\Models\Unit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
 class DonationApiController extends BaseApiController
@@ -24,10 +24,9 @@ class DonationApiController extends BaseApiController
     public function store(Request $request)
     {
         $request->validate([
-            'campaign_id'  => 'required|exists:campaigns,id',
-            'unit_id'      => 'nullable|exists:units,id',
-            'unit_qty'     => 'nullable|integer|min:1',
-            'amount'       => 'nullable|numeric|min:1000',
+            'unit_id'  => 'nullable|exists:units,id',
+            'unit_qty' => 'nullable|integer|min:1',
+            'amount'   => 'nullable|numeric|min:1000',
             'phone'        => 'required|string|min:10|max:15',
             'name'         => 'nullable|string|max:255',
             'email'        => 'nullable|email|max:255',
@@ -36,37 +35,33 @@ class DonationApiController extends BaseApiController
 
         return DB::transaction(function () use ($request) {
 
+            $campaign = Campaign::where('status', 'active')
+                ->where('start_date', '<=', now())
+                ->where('end_date', '>=', now())
+                ->lockForUpdate()
+                ->firstOrFail();
+
             $reference = 'DON-' . now()->format('YmdHis') . '-' . random_int(1000, 9999);
 
-            $finalAmount = 0;
-            $unitQty = null;
-            $unitId = null;
-
-            // 🔥 MODE UNIT (amount DI-OVERRIDE TOTAL)
             if ($request->unit_id) {
 
                 $unit = Unit::where('id', $request->unit_id)
                     ->where('is_active', true)
                     ->firstOrFail();
 
-                $unitQty = $request->unit_qty ?? 1;
+                $unitQty = $request->unit_qty;
 
                 $finalAmount = $unit->price * $unitQty;
-
-                $unitId = $unit->id;
             } else {
 
-                // 🔥 MODE MANUAL
-                if (!$request->amount) {
-                    return $this->error('Amount wajib diisi', null, 422);
-                }
-
+                $unit = null;
+                $unitQty = null;
                 $finalAmount = $request->amount;
             }
 
             Donation::create([
-                'campaign_id'  => $request->campaign_id,
-                'unit_id'      => $unitId,
+                'campaign_id'  => $campaign->id,
+                'unit_id'      => $unit?->id,
                 'unit_qty'     => $unitQty,
                 'name'         => $request->boolean('is_anonymous') ? 'Anonim' : $request->name,
                 'is_anonymous' => $request->boolean('is_anonymous'),
@@ -86,7 +81,7 @@ class DonationApiController extends BaseApiController
 
     public function pay(Request $request, $reference)
     {
-        $methods = config('payment.methods');
+        $methods = array_keys(config('payment.methods'));
 
         $request->validate([
             'payment_method' => ['required', Rule::in($methods)]
@@ -106,11 +101,18 @@ class DonationApiController extends BaseApiController
                 return $this->error('Donation already processed', null, 400);
             }
 
+            if ($donation->expired_at && now()->greaterThan($donation->expired_at)) {
+                $donation->update([
+                    'status' => 'expired'
+                ]);
+
+                return $this->error('Donation expired', null, 400);
+            }
+
             $donation->update([
                 'payment_method' => $request->payment_method
             ]);
 
-            // Call Duitku here
             $merchantCode = config('duitku.merchant_code');
             $apiKey       = config('duitku.api_key');
             $amount       = (int) $donation->amount;
@@ -130,7 +132,7 @@ class DonationApiController extends BaseApiController
                 'customerEmail'  => $donation->email ?? 'donasi@email.com',
                 'customerPhone'  => $donation->phone,
                 'callbackUrl'    => config('app.url') . '/api/duitku/callback',
-                'returnUrl'      => config('app.url') . '/payment-success?reference=' . $reference,
+                'returnUrl'      => env('FRONTEND_URL') . '/countdown?reference=' . $reference,
                 'signature'      => $signature
             ]);
 
@@ -139,6 +141,12 @@ class DonationApiController extends BaseApiController
             }
 
             $data = $response->json();
+
+            $donation->update([
+                'payment_url'     => $data['paymentUrl'] ?? null,
+                'gateway_payload' => $data,
+                'expired_at'      => $donation->expired_at ?? now()->addMinutes(10)
+            ]);
 
             return $this->success([
                 'payment_url' => $data['paymentUrl'] ?? null
@@ -182,6 +190,14 @@ class DonationApiController extends BaseApiController
                 return $this->error('Invalid signature', null, 403);
             }
 
+            if ($donation->expired_at && now()->greaterThan($donation->expired_at)) {
+                $donation->update([
+                    'status' => 'expired'
+                ]);
+
+                return $this->error('Donation expired', null, 400);
+            }
+
             $donation->update([
                 'duitku_reference' => $duitkuReference,
                 'callback_payload' => $request->all()
@@ -220,13 +236,29 @@ class DonationApiController extends BaseApiController
             return $this->error('Donation not found', null, 404);
         }
 
+        if (
+            $donation->status === 'pending' &&
+            $donation->expired_at &&
+            now()->greaterThan($donation->expired_at)
+        ) {
+            $donation->update([
+                'status' => 'expired'
+            ]);
+        }
+
         return $this->success([
             'reference'      => $donation->reference,
             'status'         => $donation->status,
             'amount'         => (float) $donation->amount,
             'paid_at'        => $donation->paid_at,
+            'expired_at'     => $donation->expired_at,
+            'created_at'     => $donation->created_at,
             'unit'           => $donation->unit?->name,
             'unit_qty'       => $donation->unit_qty,
+            'name'           => $donation->name,
+            'phone'          => $donation->phone,
+            'payment_method' => $donation->payment_method,
+            'gateway_payload' => $donation->gateway_payload,
         ], 'Donation status');
     }
 }
